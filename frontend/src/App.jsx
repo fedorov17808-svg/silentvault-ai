@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const TOP_100_ASSETS = [
   { id: 'BTC', name: 'Bitcoin', symbol: 'BTC', price: 64250.00, apy: '8.4%', risk: 38, icon: '₿' },
@@ -38,7 +38,7 @@ export default function App() {
   const [strategy, setStrategy] = useState('delta-neutral');
   const [timeframe, setTimeframe] = useState('24H');
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
+  const [analysis, setAnalysis] = useState(null); // Изначально NULL, пока не нажали кнопку!
   const [isDump, setIsDump] = useState(false);
 
   const filteredAssets = TOP_100_ASSETS.filter(a =>
@@ -53,10 +53,17 @@ export default function App() {
     return res;
   };
 
-  const fetchAnalysis = async (asset, isCrashed = false, strat = strategy) => {
+  const handleAssetSelect = (asset) => {
+    setSelectedAsset(asset);
+    setIsDropdownOpen(false);
+    setIsDump(false);
+    setAnalysis(null); // Сбрасываем старый результат, кнопка снова нужна!
+  };
+
+  const handleRunStrategy = async () => {
     setLoading(true);
-    // Добавляем искусственную микрозадержку для визуального отклика TEE
-    await new Promise(resolve => setTimeout(resolve, 350));
+    setIsDump(false);
+    await new Promise(resolve => setTimeout(resolve, 400));
 
     try {
       const response = await fetch('http://localhost:8000/api/evaluate-strategy', {
@@ -64,30 +71,30 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_address: '0x71C7...976F',
-          asset_symbol: asset.symbol,
+          asset_symbol: selectedAsset.symbol,
           amount: parseFloat(amount) || 10000,
         }),
       });
       const data = await response.json();
       
-      let defaultAction = strat === 'conservative' ? 'AUTO_HEDGE_ACTIVE' : 'DELTA_NEUTRAL_YIELD';
-      if (asset.risk > 70) defaultAction = 'EMERGENCY_PROTECTION';
+      let defaultAction = strategy === 'conservative' ? 'AUTO_HEDGE_ACTIVE' : 'DELTA_NEUTRAL_YIELD';
+      if (selectedAsset.risk > 70) defaultAction = 'EMERGENCY_PROTECTION';
 
       setAnalysis({
-        price: isCrashed ? (asset.price * 0.72).toFixed(4) : (data.ftso_price || asset.price),
-        risk: isCrashed ? 98 : (data.confidential_risk_score || asset.risk),
-        action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : defaultAction,
+        price: data.ftso_price || selectedAsset.price,
+        risk: data.confidential_risk_score || selectedAsset.risk,
+        action: defaultAction,
         signature: data.tee_attestation?.ecdsa_signature || generateRandomSig(),
         signer: data.tee_attestation?.attested_by || 'Flare-Confidential-TEE (0x9a8f...)'
       });
     } catch (err) {
-      let defaultAction = strat === 'conservative' ? 'AUTO_HEDGE_ACTIVE' : 'DELTA_NEUTRAL_YIELD';
-      if (asset.risk > 70) defaultAction = 'EMERGENCY_PROTECTION';
+      let defaultAction = strategy === 'conservative' ? 'AUTO_HEDGE_ACTIVE' : 'DELTA_NEUTRAL_YIELD';
+      if (selectedAsset.risk > 70) defaultAction = 'EMERGENCY_PROTECTION';
 
       setAnalysis({
-        price: isCrashed ? (asset.price * 0.72).toFixed(4) : asset.price,
-        risk: isCrashed ? 98 : asset.risk,
-        action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : defaultAction,
+        price: selectedAsset.price,
+        risk: selectedAsset.risk,
+        action: defaultAction,
         signature: generateRandomSig(),
         signer: 'Flare-Confidential-TEE (0x9a8f...)'
       });
@@ -96,26 +103,15 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    setIsDump(false);
-    fetchAnalysis(selectedAsset, false, strategy);
-  }, [selectedAsset]);
-
-  const handleStrategyChange = (newStrat) => {
-    setStrategy(newStrat);
-    if (!isDump) {
-      fetchAnalysis(selectedAsset, false, newStrat);
-    }
-  };
-
-  const handleRunStrategy = () => {
-    setIsDump(false);
-    fetchAnalysis(selectedAsset, false, strategy);
-  };
-
   const handleDumpMarket = () => {
     setIsDump(true);
-    fetchAnalysis(selectedAsset, true, strategy);
+    setAnalysis({
+      price: (selectedAsset.price * 0.72).toFixed(4),
+      risk: 98,
+      action: 'EMERGENCY_PROTECTION_EXECUTED',
+      signature: generateRandomSig(),
+      signer: 'Flare-TEE-AutoDefender'
+    });
   };
 
   return (
@@ -157,7 +153,7 @@ export default function App() {
       <main style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: '4.5fr 7.5fr', gap: '24px' }}>
         
         {/* Left Panel */}
-        <div style={{ background: '#0b0f19', border: '1px solid #1f2937', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ background: '#0b0f19', border: '1px solid #1f2937', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <h2 style={{ fontSize: '12px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
             ⚙️ Vault Execution Control
           </h2>
@@ -194,7 +190,7 @@ export default function App() {
                   {filteredAssets.map(asset => (
                     <div
                       key={asset.id}
-                      onClick={() => { setSelectedAsset(asset); setIsDropdownOpen(false); }}
+                      onClick={() => handleAssetSelect(asset)}
                       style={{ padding: '8px 10px', borderRadius: '8px', background: selectedAsset.id === asset.id ? 'rgba(59,130,246,0.15)' : 'transparent', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -218,7 +214,7 @@ export default function App() {
             <input
               type="number"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => { setAmount(e.target.value); setAnalysis(null); }}
               style={{ width: '100%', background: '#111827', border: '1px solid #374151', color: '#fff', padding: '12px 16px', borderRadius: '12px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
@@ -227,13 +223,13 @@ export default function App() {
             <label style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af', display: 'block', marginBottom: '8px' }}>Confidential TEE Strategy Preset</label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <button
-                onClick={() => handleStrategyChange('delta-neutral')}
+                onClick={() => { setStrategy('delta-neutral'); setAnalysis(null); }}
                 style={{ padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', border: strategy === 'delta-neutral' ? '1px solid #3b82f6' : '1px solid #1f2937', background: strategy === 'delta-neutral' ? 'rgba(59,130,246,0.15)' : '#111827', color: strategy === 'delta-neutral' ? '#60a5fa' : '#6b7280' }}
               >
                 Delta-Neutral Yield
               </button>
               <button
-                onClick={() => handleStrategyChange('conservative')}
+                onClick={() => { setStrategy('conservative'); setAnalysis(null); }}
                 style={{ padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', border: strategy === 'conservative' ? '1px solid #3b82f6' : '1px solid #1f2937', background: strategy === 'conservative' ? 'rgba(59,130,246,0.15)' : '#111827', color: strategy === 'conservative' ? '#60a5fa' : '#6b7280' }}
               >
                 Auto-Hedge Shield
@@ -241,13 +237,22 @@ export default function App() {
             </div>
           </div>
 
+          {/* Доп. блок информации, убирающий поджатость и визуальную пустую дыру */}
+          <div style={{ background: '#111827', padding: '12px 16px', borderRadius: '12px', border: '1px solid #1f2937', fontSize: '11px' }}>
+            <div style={{ color: '#9ca3af', fontWeight: '600', marginBottom: '4px' }}>🛡️ Security Policy: TEE Isolation</div>
+            <div style={{ color: '#6b7280', fontSize: '10px', lineHeight: '1.4' }}>
+              Strategy inputs are encrypted client-side. Enclave generates zero-knowledge ECDSA attestations to execute safe yield without front-running.
+            </div>
+          </div>
+
+          {/* Action Buttons плотно снизу */}
           <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '10px', marginTop: 'auto' }}>
             <button
               onClick={handleRunStrategy}
               disabled={loading}
               style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', fontSize: '13px', boxShadow: '0 4px 14px rgba(37,99,235,0.4)', opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? '⏳ Evaluating Enclave...' : '⚡ Re-evaluate TEE'}
+              {loading ? '⏳ Evaluating Enclave...' : '⚡ Run TEE Strategy'}
             </button>
 
             <button
@@ -262,6 +267,7 @@ export default function App() {
         {/* Right Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
+          {/* Chart Card */}
           <div style={{ background: '#0b0f19', border: '1px solid #1f2937', borderRadius: '20px', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -285,7 +291,7 @@ export default function App() {
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '16px' }}>
               <span style={{ fontSize: '36px', fontWeight: '800', fontFamily: 'monospace', letterSpacing: '-1px' }}>
-                ${analysis ? analysis.price : selectedAsset.price}
+                ${isDump ? (selectedAsset.price * 0.72).toFixed(2) : selectedAsset.price}
               </span>
               <span style={{ fontSize: '12px', fontWeight: '700', color: isDump ? '#f87171' : '#34d399', background: isDump ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', padding: '4px 8px', borderRadius: '6px' }}>
                 {isDump ? '-28.4% CRASH DETECTED' : '+2.4% (24h)'}
@@ -318,16 +324,17 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1, position: 'relative' }}>
+          {/* TEE Attestation Card */}
+          <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>
               🔐 Confidential TEE Attestation & On-Chain Audit
             </h3>
 
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#60a5fa', fontSize: '12px', fontWeight: '600' }} className="animate-pulse">
-                ⚡ Executing Confidential TEE Enclave Scan...
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#60a5fa', fontSize: '13px', fontWeight: '600' }}>
+                ⚡ Executing Enclave Evaluation & ECDSA Attestation...
               </div>
-            ) : analysis && (
+            ) : analysis ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
@@ -356,6 +363,12 @@ export default function App() {
                     Sig: {analysis.signature}
                   </div>
                 </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px 0', border: '1px dashed #1f2937', borderRadius: '12px', color: '#6b7280', fontSize: '12px' }}>
+                <div style={{ fontSize: '24px', marginBottom: '8px' }}>🛡️</div>
+                <div style={{ fontWeight: '600', color: '#9ca3af', marginBottom: '4px' }}>Ready for Enclave Analysis</div>
+                Configure parameters and click <span style={{ color: '#60a5fa', fontWeight: '600' }}>Run TEE Strategy</span> to evaluate risk.
               </div>
             )}
           </div>
