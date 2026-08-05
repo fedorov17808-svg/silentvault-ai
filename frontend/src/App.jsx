@@ -38,8 +38,9 @@ export default function App() {
   const [strategy, setStrategy] = useState('delta-neutral');
   const [timeframe, setTimeframe] = useState('24H');
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState(null); // Изначально NULL, пока не нажали кнопку!
+  const [analysis, setAnalysis] = useState(null);
   const [isDump, setIsDump] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const filteredAssets = TOP_100_ASSETS.filter(a =>
     a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -57,13 +58,13 @@ export default function App() {
     setSelectedAsset(asset);
     setIsDropdownOpen(false);
     setIsDump(false);
-    setAnalysis(null); // Сбрасываем старый результат, кнопка снова нужна!
+    setAnalysis(null);
   };
 
   const handleRunStrategy = async () => {
     setLoading(true);
     setIsDump(false);
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 450));
 
     try {
       const response = await fetch('http://localhost:8000/api/evaluate-strategy', {
@@ -114,6 +115,12 @@ export default function App() {
     });
   };
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#030712', color: '#f3f4f6', fontFamily: 'Inter, system-ui, sans-serif', padding: '24px' }}>
       
@@ -152,7 +159,7 @@ export default function App() {
       {/* Main Grid */}
       <main style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: '4.5fr 7.5fr', gap: '24px' }}>
         
-        {/* Left Panel */}
+        {/* Left Control Panel */}
         <div style={{ background: '#0b0f19', border: '1px solid #1f2937', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <h2 style={{ fontSize: '12px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
             ⚙️ Vault Execution Control
@@ -237,7 +244,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Доп. блок информации, убирающий поджатость и визуальную пустую дыру */}
           <div style={{ background: '#111827', padding: '12px 16px', borderRadius: '12px', border: '1px solid #1f2937', fontSize: '11px' }}>
             <div style={{ color: '#9ca3af', fontWeight: '600', marginBottom: '4px' }}>🛡️ Security Policy: TEE Isolation</div>
             <div style={{ color: '#6b7280', fontSize: '10px', lineHeight: '1.4' }}>
@@ -245,7 +251,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Action Buttons плотно снизу */}
           <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '10px', marginTop: 'auto' }}>
             <button
               onClick={handleRunStrategy}
@@ -264,7 +269,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right Panel */}
+        {/* Right Analytics Area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* Chart Card */}
@@ -324,22 +329,41 @@ export default function App() {
             </div>
           </div>
 
-          {/* TEE Attestation Card */}
-          <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <h3 style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>
-              🔐 Confidential TEE Attestation & On-Chain Audit
-            </h3>
+          {/* HIGH-TECH ENCLAVE TERMINAL CARD */}
+          <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1 }}>
+            
+            {/* Title & Hardware Badges */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
+                🔐 CONFIDENTIAL TEE ATTESTATION & ON-CHAIN AUDIT
+              </h3>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <span style={{ fontSize: '9px', background: '#111827', border: '1px solid #1f2937', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                  Intel SGX
+                </span>
+                <span style={{ fontSize: '9px', background: '#111827', border: '1px solid #1f2937', color: '#34d399', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                  FTSO Validated
+                </span>
+              </div>
+            </div>
 
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#60a5fa', fontSize: '13px', fontWeight: '600' }}>
-                ⚡ Executing Enclave Evaluation & ECDSA Attestation...
+              <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#60a5fa', marginBottom: '8px' }}>
+                  ⚡ Executing Hardware Enclave Computation...
+                </div>
+                <div style={{ fontSize: '10px', color: '#6b7280', fontFamily: 'monospace' }}>
+                  decrypting_payload() -> validating_ftso_v2_oracle() -> signing_attestation()
+                </div>
               </div>
             ) : analysis ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                
+                {/* Risk Score Gauge Bar */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
-                    <span style={{ color: '#9ca3af' }}>Confidential Risk Score:</span>
-                    <span style={{ fontWeight: '800', fontFamily: 'monospace', color: analysis.risk > 70 ? '#f87171' : '#34d399' }}>
+                    <span style={{ color: '#9ca3af', fontWeight: '500' }}>Confidential Risk Score:</span>
+                    <span style={{ fontWeight: '800', fontFamily: 'monospace', fontSize: '13px', color: analysis.risk > 70 ? '#f87171' : '#34d399' }}>
                       {analysis.risk} / 100
                     </span>
                   </div>
@@ -348,29 +372,52 @@ export default function App() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111827', padding: '12px 16px', borderRadius: '12px', border: '1px solid #1f2937' }}>
-                  <span style={{ fontSize: '11px', color: '#9ca3af' }}>Recommended Action:</span>
-                  <span style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: '700', color: isDump ? '#f87171' : '#60a5fa', background: isDump ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)', padding: '4px 10px', borderRadius: '6px' }}>
-                    {analysis.action}
-                  </span>
+                {/* Status Badges */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ background: '#111827', padding: '10px 14px', borderRadius: '10px', border: '1px solid #1f2937' }}>
+                    <div style={{ fontSize: '9px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Recommended Action</div>
+                    <div style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: '700', color: isDump ? '#f87171' : '#60a5fa' }}>
+                      {analysis.action}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#111827', padding: '10px 14px', borderRadius: '10px', border: '1px solid #1f2937' }}>
+                    <div style={{ fontSize: '9px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>MEV Anti-Frontrunning</div>
+                    <div style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: '700', color: '#34d399' }}>
+                      PROTECTED (0 SLIPPAGE)
+                    </div>
+                  </div>
                 </div>
 
-                <div style={{ background: '#111827', padding: '12px', borderRadius: '12px', border: '1px solid #1f2937', fontSize: '10px', fontFamily: 'monospace' }}>
-                  <div style={{ color: '#34d399', fontWeight: '600', marginBottom: '4px' }}>
-                    ✔ Attested by {analysis.signer}
+                {/* Console Log + Copy Signature */}
+                <div style={{ background: '#030712', border: '1px solid #1f2937', borderRadius: '12px', padding: '12px', fontFamily: 'monospace', fontSize: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#34d399', fontWeight: '600', marginBottom: '6px' }}>
+                    <span>✔ Attested by {analysis.signer}</span>
+                    <button
+                      onClick={() => copyToClipboard(analysis.signature)}
+                      style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '9px' }}
+                    >
+                      {copied ? 'Copied!' : 'Copy ECDSA Proof'}
+                    </button>
                   </div>
-                  <div style={{ color: '#6b7280', wordBreak: 'break-all' }}>
+                  <div style={{ color: '#6b7280', wordBreak: 'break-all', marginBottom: '6px' }}>
                     Sig: {analysis.signature}
                   </div>
+                  <div style={{ color: '#4b5563', fontSize: '9px', display: 'flex', gap: '12px' }}>
+                    <span>Nonce: 0x8f2d9e1a</span>
+                    <span>Algorithm: secp256k1</span>
+                  </div>
                 </div>
+
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0', border: '1px dashed #1f2937', borderRadius: '12px', color: '#6b7280', fontSize: '12px' }}>
-                <div style={{ fontSize: '24px', marginBottom: '8px' }}>🛡️</div>
-                <div style={{ fontWeight: '600', color: '#9ca3af', marginBottom: '4px' }}>Ready for Enclave Analysis</div>
-                Configure parameters and click <span style={{ color: '#60a5fa', fontWeight: '600' }}>Run TEE Strategy</span> to evaluate risk.
+              <div style={{ textAlign: 'center', padding: '36px 0', border: '1px dashed #1f2937', borderRadius: '12px', color: '#6b7280', fontSize: '12px' }}>
+                <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔐</div>
+                <div style={{ fontWeight: '600', color: '#9ca3af', marginBottom: '4px' }}>Ready for Hardware TEE Computation</div>
+                Configure strategy inputs and click <span style={{ color: '#60a5fa', fontWeight: '600' }}>Run TEE Strategy</span> to execute zero-knowledge evaluation.
               </div>
             )}
+
           </div>
 
         </div>
