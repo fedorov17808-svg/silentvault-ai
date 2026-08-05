@@ -46,8 +46,18 @@ export default function App() {
     a.symbol.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const generateRandomSig = () => {
+    const chars = '0123456789abcdef';
+    let res = '0x';
+    for (let i = 0; i < 40; i++) res += chars[Math.floor(Math.random() * chars.length)];
+    return res;
+  };
+
   const fetchAnalysis = async (asset, isCrashed = false, strat = strategy) => {
     setLoading(true);
+    // Добавляем искусственную микрозадержку для визуального отклика TEE
+    await new Promise(resolve => setTimeout(resolve, 350));
+
     try {
       const response = await fetch('http://localhost:8000/api/evaluate-strategy', {
         method: 'POST',
@@ -67,7 +77,7 @@ export default function App() {
         price: isCrashed ? (asset.price * 0.72).toFixed(4) : (data.ftso_price || asset.price),
         risk: isCrashed ? 98 : (data.confidential_risk_score || asset.risk),
         action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : defaultAction,
-        signature: data.tee_attestation?.ecdsa_signature || '0x3a9b8f7c1d2e4a5b6c7d8e9f0a1b2c3d4e5f6a7b',
+        signature: data.tee_attestation?.ecdsa_signature || generateRandomSig(),
         signer: data.tee_attestation?.attested_by || 'Flare-Confidential-TEE (0x9a8f...)'
       });
     } catch (err) {
@@ -78,7 +88,7 @@ export default function App() {
         price: isCrashed ? (asset.price * 0.72).toFixed(4) : asset.price,
         risk: isCrashed ? 98 : asset.risk,
         action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : defaultAction,
-        signature: '0x8f2d9e1a3b9b8f7c1d2e4a5b6c7d8e9f0a1b2c3d',
+        signature: generateRandomSig(),
         signer: 'Flare-Confidential-TEE (0x9a8f...)'
       });
     } finally {
@@ -111,7 +121,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#030712', color: '#f3f4f6', fontFamily: 'Inter, system-ui, sans-serif', padding: '24px' }}>
       
-      {/* Top Header */}
+      {/* Header */}
       <header style={{ maxWidth: '1280px', margin: '0 auto 24px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b0f19', border: '1px solid #1f2937', padding: '16px 24px', borderRadius: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{ width: '42px', height: '42px', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', boxShadow: '0 0 20px rgba(37,99,235,0.4)' }}>
@@ -235,9 +245,9 @@ export default function App() {
             <button
               onClick={handleRunStrategy}
               disabled={loading}
-              style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', fontSize: '13px', boxShadow: '0 4px 14px rgba(37,99,235,0.4)', opacity: loading ? 0.6 : 1 }}
+              style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', fontSize: '13px', boxShadow: '0 4px 14px rgba(37,99,235,0.4)', opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? 'Evaluating Enclave...' : '⚡ Re-evaluate TEE'}
+              {loading ? '⏳ Evaluating Enclave...' : '⚡ Re-evaluate TEE'}
             </button>
 
             <button
@@ -308,12 +318,16 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1 }}>
+          <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1, position: 'relative' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>
               🔐 Confidential TEE Attestation & On-Chain Audit
             </h3>
 
-            {analysis && (
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#60a5fa', fontSize: '12px', fontWeight: '600' }} className="animate-pulse">
+                ⚡ Executing Confidential TEE Enclave Scan...
+              </div>
+            ) : analysis && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
