@@ -13,7 +13,7 @@ export default function App() {
     FXRP: { name: 'FXRP (XRP Bridge)', basePrice: 0.5840, risk: 58, apy: '12.1%' },
     FLR: { name: 'FLR (Native Flare)', basePrice: 0.0309, risk: 28, apy: '15.6%' },
     ETH: { name: 'ETH (Ethereum)', basePrice: 3450.00, risk: 35, apy: '6.2%' },
-    USDC: { name: 'USDC (Stablecoin)', price: 1.0000, risk: 5, apy: '4.8%' },
+    USDC: { name: 'USDC (Stablecoin)', basePrice: 1.0000, risk: 5, apy: '4.8%' },
   };
 
   const current = assets[selectedAsset] || assets.FBTC;
