@@ -31,7 +31,7 @@ for (let i = 16; i <= 100; i++) {
 }
 
 export default function App() {
-  const [selectedAsset, setSelectedAsset] = useState(TOP_100_ASSETS[0]); // BTC
+  const [selectedAsset, setSelectedAsset] = useState(TOP_100_ASSETS[0]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [amount, setAmount] = useState('10000');
@@ -46,8 +46,7 @@ export default function App() {
     a.symbol.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Функция получения анализа от TEE (или авто-генерация)
-  const fetchAnalysis = async (asset, isCrashed = false) => {
+  const fetchAnalysis = async (asset, isCrashed = false, strat = strategy) => {
     setLoading(true);
     try {
       const response = await fetch('http://localhost:8000/api/evaluate-strategy', {
@@ -60,18 +59,25 @@ export default function App() {
         }),
       });
       const data = await response.json();
+      
+      let defaultAction = strat === 'conservative' ? 'AUTO_HEDGE_ACTIVE' : 'DELTA_NEUTRAL_YIELD';
+      if (asset.risk > 70) defaultAction = 'EMERGENCY_PROTECTION';
+
       setAnalysis({
         price: isCrashed ? (asset.price * 0.72).toFixed(4) : (data.ftso_price || asset.price),
         risk: isCrashed ? 98 : (data.confidential_risk_score || asset.risk),
-        action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : (data.recommended_action || 'SAFE_AUTO_YIELD'),
+        action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : defaultAction,
         signature: data.tee_attestation?.ecdsa_signature || '0x3a9b8f7c1d2e4a5b6c7d8e9f0a1b2c3d4e5f6a7b',
         signer: data.tee_attestation?.attested_by || 'Flare-Confidential-TEE (0x9a8f...)'
       });
     } catch (err) {
+      let defaultAction = strat === 'conservative' ? 'AUTO_HEDGE_ACTIVE' : 'DELTA_NEUTRAL_YIELD';
+      if (asset.risk > 70) defaultAction = 'EMERGENCY_PROTECTION';
+
       setAnalysis({
         price: isCrashed ? (asset.price * 0.72).toFixed(4) : asset.price,
         risk: isCrashed ? 98 : asset.risk,
-        action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : (asset.risk > 70 ? 'EMERGENCY_PROTECTION' : (asset.risk > 50 ? 'HEDGE_REQUIRED' : 'SAFE_AUTO_YIELD')),
+        action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : defaultAction,
         signature: '0x8f2d9e1a3b9b8f7c1d2e4a5b6c7d8e9f0a1b2c3d',
         signer: 'Flare-Confidential-TEE (0x9a8f...)'
       });
@@ -80,20 +86,26 @@ export default function App() {
     }
   };
 
-  // Вызывается СРАЗУ при первой загрузке и смене активов
   useEffect(() => {
     setIsDump(false);
-    fetchAnalysis(selectedAsset, false);
+    fetchAnalysis(selectedAsset, false, strategy);
   }, [selectedAsset]);
+
+  const handleStrategyChange = (newStrat) => {
+    setStrategy(newStrat);
+    if (!isDump) {
+      fetchAnalysis(selectedAsset, false, newStrat);
+    }
+  };
 
   const handleRunStrategy = () => {
     setIsDump(false);
-    fetchAnalysis(selectedAsset, false);
+    fetchAnalysis(selectedAsset, false, strategy);
   };
 
   const handleDumpMarket = () => {
     setIsDump(true);
-    fetchAnalysis(selectedAsset, true);
+    fetchAnalysis(selectedAsset, true, strategy);
   };
 
   return (
@@ -114,7 +126,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Global Stats */}
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '10px', color: '#6b7280' }}>Total Vault Protection</div>
@@ -135,13 +146,12 @@ export default function App() {
       {/* Main Grid */}
       <main style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: '4.5fr 7.5fr', gap: '24px' }}>
         
-        {/* Left Control Panel */}
+        {/* Left Panel */}
         <div style={{ background: '#0b0f19', border: '1px solid #1f2937', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <h2 style={{ fontSize: '12px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
             ⚙️ Vault Execution Control
           </h2>
 
-          {/* Custom Selector */}
           <div style={{ position: 'relative' }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af', display: 'block', marginBottom: '6px' }}>
               Target Asset (Top 100+ Feeds)
@@ -190,7 +200,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Deposit Amount */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
               <label style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af' }}>Vault Deposit Amount (USD)</label>
@@ -204,18 +213,17 @@ export default function App() {
             />
           </div>
 
-          {/* Strategy Presets */}
           <div>
             <label style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af', display: 'block', marginBottom: '8px' }}>Confidential TEE Strategy Preset</label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <button
-                onClick={() => setStrategy('delta-neutral')}
+                onClick={() => handleStrategyChange('delta-neutral')}
                 style={{ padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', border: strategy === 'delta-neutral' ? '1px solid #3b82f6' : '1px solid #1f2937', background: strategy === 'delta-neutral' ? 'rgba(59,130,246,0.15)' : '#111827', color: strategy === 'delta-neutral' ? '#60a5fa' : '#6b7280' }}
               >
                 Delta-Neutral Yield
               </button>
               <button
-                onClick={() => setStrategy('conservative')}
+                onClick={() => handleStrategyChange('conservative')}
                 style={{ padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', border: strategy === 'conservative' ? '1px solid #3b82f6' : '1px solid #1f2937', background: strategy === 'conservative' ? 'rgba(59,130,246,0.15)' : '#111827', color: strategy === 'conservative' ? '#60a5fa' : '#6b7280' }}
               >
                 Auto-Hedge Shield
@@ -223,7 +231,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '10px', marginTop: 'auto' }}>
             <button
               onClick={handleRunStrategy}
@@ -242,10 +249,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right Info */}
+        {/* Right Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Chart Card */}
           <div style={{ background: '#0b0f19', border: '1px solid #1f2937', borderRadius: '20px', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -276,7 +282,6 @@ export default function App() {
               </span>
             </div>
 
-            {/* Chart SVG */}
             <div style={{ width: '100%', height: '100px', overflow: 'hidden' }}>
               <svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none">
                 <defs>
@@ -303,7 +308,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Instant TEE Attestation Card */}
           <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1 }}>
             <h3 style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>
               🔐 Confidential TEE Attestation & On-Chain Audit
