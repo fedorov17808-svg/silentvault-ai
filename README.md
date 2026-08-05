@@ -14,3 +14,11 @@
 
 ## 🌐 Live Demo
 * **URL:** https://silentvault-ai-xxx.vercel.app
+
+## 📸 Interface Screenshots
+
+### 🟢 Normal Operation & TEE Attestation Mode
+![SilentVault Normal Operating Mode](./docs/images/demo-normal.png)
+
+### 🔴 Emergency Auto-Hedge Mode (Market Crash Triggered)
+![SilentVault Dump Protection Mode](./docs/images/demo-dump.png)
