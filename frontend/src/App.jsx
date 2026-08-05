@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const TOP_100_ASSETS = [
   { id: 'BTC', name: 'Bitcoin', symbol: 'BTC', price: 64250.00, apy: '8.4%', risk: 38, icon: '₿' },
@@ -18,7 +18,6 @@ const TOP_100_ASSETS = [
   { id: 'USDC', name: 'USD Coin', symbol: 'USDC', price: 1.0000, apy: '4.8%', risk: 5, icon: '💵' },
 ];
 
-// Дополняем до 100+
 for (let i = 16; i <= 100; i++) {
   TOP_100_ASSETS.push({
     id: `TOKEN_${i}`,
@@ -32,7 +31,7 @@ for (let i = 16; i <= 100; i++) {
 }
 
 export default function App() {
-  const [selectedAsset, setSelectedAsset] = useState(TOP_100_ASSETS[1]); // ETH default
+  const [selectedAsset, setSelectedAsset] = useState(TOP_100_ASSETS[0]); // BTC
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [amount, setAmount] = useState('10000');
@@ -47,32 +46,32 @@ export default function App() {
     a.symbol.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleRunStrategy = async () => {
+  // Функция получения анализа от TEE (или авто-генерация)
+  const fetchAnalysis = async (asset, isCrashed = false) => {
     setLoading(true);
-    setIsDump(false);
     try {
       const response = await fetch('http://localhost:8000/api/evaluate-strategy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_address: '0x71C7...976F',
-          asset_symbol: selectedAsset.symbol,
+          asset_symbol: asset.symbol,
           amount: parseFloat(amount) || 10000,
         }),
       });
       const data = await response.json();
       setAnalysis({
-        price: data.ftso_price || selectedAsset.price,
-        risk: data.confidential_risk_score || selectedAsset.risk,
-        action: data.recommended_action || 'SAFE_AUTO_YIELD',
+        price: isCrashed ? (asset.price * 0.72).toFixed(4) : (data.ftso_price || asset.price),
+        risk: isCrashed ? 98 : (data.confidential_risk_score || asset.risk),
+        action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : (data.recommended_action || 'SAFE_AUTO_YIELD'),
         signature: data.tee_attestation?.ecdsa_signature || '0x3a9b8f7c1d2e4a5b6c7d8e9f0a1b2c3d4e5f6a7b',
-        signer: data.tee_attestation?.attested_by || 'Flare-Confidential-TEE'
+        signer: data.tee_attestation?.attested_by || 'Flare-Confidential-TEE (0x9a8f...)'
       });
     } catch (err) {
       setAnalysis({
-        price: selectedAsset.price,
-        risk: selectedAsset.risk,
-        action: selectedAsset.risk > 70 ? 'EMERGENCY_PROTECTION' : (selectedAsset.risk > 50 ? 'HEDGE_REQUIRED' : 'SAFE_AUTO_YIELD'),
+        price: isCrashed ? (asset.price * 0.72).toFixed(4) : asset.price,
+        risk: isCrashed ? 98 : asset.risk,
+        action: isCrashed ? 'EMERGENCY_PROTECTION_EXECUTED' : (asset.risk > 70 ? 'EMERGENCY_PROTECTION' : (asset.risk > 50 ? 'HEDGE_REQUIRED' : 'SAFE_AUTO_YIELD')),
         signature: '0x8f2d9e1a3b9b8f7c1d2e4a5b6c7d8e9f0a1b2c3d',
         signer: 'Flare-Confidential-TEE (0x9a8f...)'
       });
@@ -81,16 +80,20 @@ export default function App() {
     }
   };
 
+  // Вызывается СРАЗУ при первой загрузке и смене активов
+  useEffect(() => {
+    setIsDump(false);
+    fetchAnalysis(selectedAsset, false);
+  }, [selectedAsset]);
+
+  const handleRunStrategy = () => {
+    setIsDump(false);
+    fetchAnalysis(selectedAsset, false);
+  };
+
   const handleDumpMarket = () => {
     setIsDump(true);
-    const crashedPrice = (selectedAsset.price * 0.72).toFixed(4);
-    setAnalysis({
-      price: crashedPrice,
-      risk: 98,
-      action: 'EMERGENCY_PROTECTION_EXECUTED',
-      signature: '0xCRASH_PROTECTED_TEE_EMERGENCY_SIG_9982',
-      signer: 'Flare-TEE-AutoDefender'
-    });
+    fetchAnalysis(selectedAsset, true);
   };
 
   return (
@@ -114,7 +117,7 @@ export default function App() {
         {/* Global Stats */}
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: '#6b7280', uppercase: 'true' }}>Total Vault Protection</div>
+            <div style={{ fontSize: '10px', color: '#6b7280' }}>Total Vault Protection</div>
             <div style={{ fontSize: '14px', fontWeight: '700', fontFamily: 'monospace', color: '#34d399' }}>$14,280,400</div>
           </div>
           <div style={{ width: '1px', height: '28px', background: '#1f2937' }}></div>
@@ -129,16 +132,16 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Dashboard Layout */}
+      {/* Main Grid */}
       <main style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: '4.5fr 7.5fr', gap: '24px' }}>
         
-        {/* Left Control Card */}
+        {/* Left Control Panel */}
         <div style={{ background: '#0b0f19', border: '1px solid #1f2937', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <h2 style={{ fontSize: '12px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
             ⚙️ Vault Execution Control
           </h2>
 
-          {/* Custom Asset Selector */}
+          {/* Custom Selector */}
           <div style={{ position: 'relative' }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af', display: 'block', marginBottom: '6px' }}>
               Target Asset (Top 100+ Feeds)
@@ -158,12 +161,11 @@ export default function App() {
               <span style={{ color: '#6b7280', fontSize: '12px' }}>{isDropdownOpen ? '▲' : '▼'}</span>
             </button>
 
-            {/* Custom Modal/Dropdown */}
             {isDropdownOpen && (
               <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#111827', border: '1px solid #374151', borderRadius: '12px', zIndex: 50, padding: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.8)' }}>
                 <input
                   type="text"
-                  placeholder="🔍 Search 100+ coins (BTC, ALGO, OP, PEPE)..."
+                  placeholder="🔍 Search 100+ coins..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{ width: '100%', background: '#030712', border: '1px solid #1f2937', color: '#fff', padding: '10px', borderRadius: '8px', fontSize: '12px', outline: 'none', marginBottom: '10px', boxSizing: 'border-box' }}
@@ -172,7 +174,7 @@ export default function App() {
                   {filteredAssets.map(asset => (
                     <div
                       key={asset.id}
-                      onClick={() => { setSelectedAsset(asset); setIsDropdownOpen(false); setAnalysis(null); setIsDump(false); }}
+                      onClick={() => { setSelectedAsset(asset); setIsDropdownOpen(false); }}
                       style={{ padding: '8px 10px', borderRadius: '8px', background: selectedAsset.id === asset.id ? 'rgba(59,130,246,0.15)' : 'transparent', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -202,7 +204,7 @@ export default function App() {
             />
           </div>
 
-          {/* Preset Buttons */}
+          {/* Strategy Presets */}
           <div>
             <label style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af', display: 'block', marginBottom: '8px' }}>Confidential TEE Strategy Preset</label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -228,7 +230,7 @@ export default function App() {
               disabled={loading}
               style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', fontSize: '13px', boxShadow: '0 4px 14px rgba(37,99,235,0.4)', opacity: loading ? 0.6 : 1 }}
             >
-              {loading ? 'Evaluating Enclave...' : '⚡ Run TEE Strategy'}
+              {loading ? 'Evaluating Enclave...' : '⚡ Re-evaluate TEE'}
             </button>
 
             <button
@@ -240,7 +242,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right Analytics Area */}
+        {/* Right Info */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* Chart Card */}
@@ -252,7 +254,6 @@ export default function App() {
                 <span style={{ fontSize: '10px', background: '#111827', color: '#6b7280', padding: '2px 6px', borderRadius: '4px' }}>FTSO v2 Feed</span>
               </div>
 
-              {/* Timeframe selector */}
               <div style={{ display: 'flex', gap: '4px', background: '#111827', padding: '2px', borderRadius: '8px' }}>
                 {['1H', '24H', '7D', '1Y'].map(tf => (
                   <button
@@ -266,7 +267,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', items: 'baseline', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '16px' }}>
               <span style={{ fontSize: '36px', fontWeight: '800', fontFamily: 'monospace', letterSpacing: '-1px' }}>
                 ${analysis ? analysis.price : selectedAsset.price}
               </span>
@@ -275,7 +276,7 @@ export default function App() {
               </span>
             </div>
 
-            {/* SVG Area Chart */}
+            {/* Chart SVG */}
             <div style={{ width: '100%', height: '100px', overflow: 'hidden' }}>
               <svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none">
                 <defs>
@@ -302,13 +303,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* Attestation Status Card */}
+          {/* Instant TEE Attestation Card */}
           <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1 }}>
             <h3 style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>
               🔐 Confidential TEE Attestation & On-Chain Audit
             </h3>
 
-            {analysis ? (
+            {analysis && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
@@ -337,11 +338,6 @@ export default function App() {
                     Sig: {analysis.signature}
                   </div>
                 </div>
-
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '30px 0', color: '#4b5563', fontSize: '12px' }}>
-                Select asset and click <span style={{ color: '#60a5fa', fontWeight: '600' }}>Run TEE Strategy</span> to execute confidential analysis.
               </div>
             )}
           </div>
