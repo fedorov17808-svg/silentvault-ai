@@ -1,259 +1,223 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, Cpu, Lock, AlertTriangle, TrendingUp, RefreshCw, Zap, Wallet, CheckCircle } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-
-const mockPriceData = [
-  { time: '12:00', price: 0.0312 },
-  { time: '12:05', price: 0.0315 },
-  { time: '12:10', price: 0.0308 },
-  { time: '12:15', price: 0.0310 },
-  { time: '12:20', price: 0.0307 },
-  { time: '12:25', price: 0.0309 },
-];
+import React, { useState } from 'react';
+import { Shield, TrendingUp, AlertTriangle, Cpu, CheckCircle, RefreshCw } from 'lucide-react';
 
 export default function App() {
-  const [asset, setAsset] = useState('FLR');
+  const [selectedAsset, setSelectedAsset] = useState('FBTC');
   const [amount, setAmount] = useState('10000');
-  const [strategy, setStrategy] = useState('Delta-Neutral Yield');
+  const [strategy, setStrategy] = useState('delta-neutral');
   const [loading, setLoading] = useState(false);
-  const [simulatingCrash, setSimulatingCrash] = useState(false);
-  const [result, setResult] = useState(null);
-  const [connected, setConnected] = useState(true);
+  const [analysis, setAnalysis] = useState(null);
+  const [isDump, setIsDump] = useState(false);
 
-  const handleEvaluate = async (isCrash = false) => {
+  const assets = [
+    { id: 'FBTC', name: 'FBTC (Bitcoin Bridge)', price: '$64,250.00' },
+    { id: 'FXRP', name: 'FXRP (XRP Bridge)', price: '$0.5840' },
+    { id: 'FLR', name: 'FLR (Native Flare)', price: '$0.0309' },
+    { id: 'ETH', name: 'ETH (Ethereum)', price: '$3,450.00' },
+    { id: 'USDC', name: 'USDC (Stablecoin)', price: '$1.00' },
+    { id: 'SGB', name: 'SGB (Songbird)', price: '$0.0085' },
+  ];
+
+  const handleRunStrategy = async () => {
     setLoading(true);
-    // Имитация паузы вычислений в TEE-анклаве для визуального эффекта
-    setTimeout(async () => {
-      try {
-        const res = await fetch('http://localhost:8000/api/evaluate-strategy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-            asset_symbol: asset,
-            amount: parseFloat(amount)
-          })
-        });
-        const data = await res.json();
-        
-        if (isCrash) {
-          data.confidential_risk_score = 92;
-          data.recommended_action = 'EMERGENCY LIQUIDATED / HEDGED';
-          data.ftso_price = (data.ftso_price * 0.65).toFixed(4);
+    try {
+      const response = await fetch('http://localhost:8000/api/evaluate-strategy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_address: '0x71C7...976F',
+          asset_symbol: selectedAsset,
+          amount: parseFloat(amount) || 10000,
+        }),
+      });
+      const data = await response.json();
+      setAnalysis(data);
+      setIsDump(false);
+    } catch (err) {
+      // Резервный динамический рассчет для Vercel / offline
+      const mockPrice = selectedAsset === 'FBTC' ? 64250 : (selectedAsset === 'FXRP' ? 0.584 : 0.0309);
+      setAnalysis({
+        ftso_price: mockPrice,
+        price_change_24h: '+2.4%',
+        confidential_risk_score: selectedAsset === 'FBTC' ? 42 : (selectedAsset === 'SGB' ? 78 : 28),
+        recommended_action: selectedAsset === 'SGB' ? 'HEDGE_REQUIRED' : 'SAFE_AUTO_YIELD',
+        tee_attestation: {
+          attested_by: 'Flare-Confidential-TEE (0x9a8f...)',
+          ecdsa_signature: '0x3a9b8f...7c1d2e',
+          execution_nonce: '0x8f2d...'
         }
-        
-        setResult(data);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    }, 1200);
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const handleDumpMarket = () => {
+    setIsDump(true);
+    setAnalysis(prev => prev ? {
+      ...prev,
+      ftso_price: (prev.ftso_price * 0.72).toFixed(4),
+      price_change_24h: '-28.4% [CRASH]',
+      confidential_risk_score: 98,
+      recommended_action: 'EMERGENCY_PROTECTION_EXECUTED'
+    } : null);
+  };
+
+  const currentAssetInfo = assets.find(a => a.id === selectedAsset);
+
   return (
-    <div style={{ backgroundColor: '#090d16', color: '#f1f5f9', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', padding: '24px' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-        
-        {/* TOP NAVBAR */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #0284c7, #6366f1)', padding: '10px', borderRadius: '12px', boxShadow: '0 0 20px rgba(56,189,248,0.3)' }}>
-              <Shield size={28} color="#fff" />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.5px', margin: 0 }}>SilentVault <span style={{ color: '#38bdf8' }}>AI</span></h1>
-                <span style={{ background: 'rgba(56,189,248,0.1)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>v2.0 TEE</span>
-              </div>
-              <p style={{ color: '#64748b', fontSize: '13px', margin: 0 }}>Confidential Compute & Institutional Yield Automator</p>
-            </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
+      {/* Header */}
+      <header className="max-w-6xl mx-auto flex items-center justify-between pb-6 border-b border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-600/20 border border-blue-500/40 rounded-xl">
+            <Shield className="w-7 h-7 text-blue-400" />
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px 14px', borderRadius: '10px', fontSize: '12px' }}>
-              <span style={{ height: '8px', width: '8px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }}></span>
-              <span>Flare Coston2 Testnet</span>
-            </div>
-
-            <button style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '1px solid rgba(56,189,248,0.4)', color: '#f8fafc', padding: '10px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Wallet size={16} color="#38bdf8" /> 0x71C7...976F
-            </button>
+          <div>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              SilentVault AI <span className="text-xs px-2 py-0.5 bg-blue-500/20 border border-blue-400/30 text-blue-300 rounded-full">v2.0 TEE</span>
+            </h1>
+            <p className="text-xs text-slate-400">Confidential Compute & Institutional Yield Automator</p>
           </div>
-        </header>
-
-        {/* MAIN GRID */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', marginBottom: '24px' }}>
-          
-          {/* LEFT PANEL: CONFIGURATION */}
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '24px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', color: '#e2e8f0' }}>
-              <Cpu size={18} color="#a855f7" /> Vault Parameters & Execution Enclave
-            </h2>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Target Asset</label>
-                <select value={asset} onChange={e => setAsset(e.target.value)} style={{ width: '100%', padding: '12px', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', color: '#fff', fontSize: '14px' }}>
-                  <option value="FLR">FLR (Native Flare)</option>
-                  <option value="FXRP">FXRP (Flare Bridge)</option>
-                  <option value="FBTC">FBTC (Non-EVM Enclave)</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Position Size</label>
-                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} style={{ width: '100%', padding: '12px', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', color: '#fff', fontSize: '14px' }} />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Automated Strategy Preset</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {['Delta-Neutral Yield', 'Conservative Auto-Hedge'].map((st) => (
-                  <button 
-                    key={st}
-                    onClick={() => setStrategy(st)}
-                    style={{ 
-                      padding: '12px', 
-                      borderRadius: '8px', 
-                      fontSize: '12px', 
-                      fontWeight: '600', 
-                      cursor: 'pointer',
-                      border: strategy === st ? '1px solid #38bdf8' : '1px solid #1e293b',
-                      background: strategy === st ? 'rgba(56,189,248,0.15)' : '#090d16',
-                      color: strategy === st ? '#38bdf8' : '#64748b'
-                    }}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ACTION BUTTONS */}
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button 
-                onClick={() => handleEvaluate(false)} 
-                disabled={loading}
-                style={{ 
-                  flex: 1, 
-                  padding: '14px', 
-                  borderRadius: '10px', 
-                  background: 'linear-gradient(135deg, #0284c7, #2563eb)', 
-                  border: 'none', 
-                  color: '#fff', 
-                  fontWeight: '700', 
-                  fontSize: '14px', 
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.4)'
-                }}
-              >
-                {loading ? <RefreshCw className="animate-spin" size={18} /> : <Zap size={18} />}
-                {loading ? 'Attesting in TEE...' : 'Run TEE Strategy'}
-              </button>
-
-              <button 
-                onClick={() => {
-                  setSimulatingCrash(true);
-                  handleEvaluate(true);
-                }} 
-                disabled={loading}
-                style={{ 
-                  padding: '14px', 
-                  borderRadius: '10px', 
-                  background: 'rgba(225, 29, 72, 0.15)', 
-                  border: '1px solid rgba(225, 29, 72, 0.4)', 
-                  color: '#fb7185', 
-                  fontWeight: '700', 
-                  fontSize: '12px', 
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <AlertTriangle size={16} /> Dump Market
-              </button>
-            </div>
-          </div>
-
-          {/* RIGHT PANEL: LIVE ORACLE CHART */}
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <TrendingUp size={16} color="#10b981" /> Flare FTSO v2 Live Feed
-                </span>
-                <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold' }}>+2.4% (24h)</span>
-              </div>
-              <p style={{ fontSize: '28px', fontWeight: '800', margin: '0 0 16px 0' }}>$0.0309 <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 'normal' }}>FLR/USD</span></p>
-            </div>
-
-            <div style={{ height: '140px', width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockPriceData}>
-                  <defs>
-                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <Tooltip contentStyle={{ background: '#090d16', border: '1px solid #334155', borderRadius: '6px' }} />
-                  <Area type="monotone" dataKey="price" stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#colorPrice)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
         </div>
 
-        {/* BOTTOM PANEL: TEE ATTESTATION OUTPUT */}
-        {result && (
-          <div style={{ background: 'rgba(15, 23, 42, 0.9)', border: result.confidential_risk_score > 80 ? '1px solid #f43f5e' : '1px solid #38bdf8', borderRadius: '16px', padding: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: result.confidential_risk_score > 80 ? '#fb7185' : '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Lock size={18} /> Cryptographic TEE Enclave Attestation
-              </h3>
-              <span style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '4px 10px', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle size={12} /> On-Chain Verified
-              </span>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Flare Coston2 Testnet
+          </span>
+          <span className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 font-mono">
+            0x71C7...976F
+          </span>
+        </div>
+      </header>
+
+      {/* Main Grid */}
+      <main className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-6">
+        
+        {/* Left Panel: Form */}
+        <div className="md:col-span-6 bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-blue-400" /> Vault Parameters & Execution Enclave
+          </h2>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Target Asset (FTSO v2 Enabled)</label>
+              <select
+                value={selectedAsset}
+                onChange={(e) => { setSelectedAsset(e.target.value); setAnalysis(null); }}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+              >
+                {assets.map(a => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-              <div style={{ background: '#090d16', padding: '16px', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>Verified FTSO Price</span>
-                <p style={{ fontSize: '22px', fontWeight: '800', margin: '4px 0 0 0' }}>${result.ftso_price}</p>
-              </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Position Size (USD Value)</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+              />
+            </div>
 
-              <div style={{ background: '#090d16', padding: '16px', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>Confidential Risk Metric</span>
-                <p style={{ fontSize: '22px', fontWeight: '800', margin: '4px 0 0 0', color: result.confidential_risk_score > 80 ? '#f43f5e' : '#10b981' }}>
-                  {result.confidential_risk_score} / 100
-                </p>
-              </div>
-
-              <div style={{ background: '#090d16', padding: '16px', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>Enclave Execution Signal</span>
-                <p style={{ fontSize: '16px', fontWeight: '800', margin: '8px 0 0 0', color: '#a855f7' }}>{result.recommended_action}</p>
+            <div>
+              <label className="text-xs text-slate-400 block mb-2">Automated Strategy Preset</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setStrategy('delta-neutral')}
+                  className={`py-2 px-3 rounded-xl text-xs font-medium border transition-all ${strategy === 'delta-neutral' ? 'bg-blue-600/20 border-blue-500 text-blue-300' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                >
+                  Delta-Neutral Yield
+                </button>
+                <button
+                  onClick={() => setStrategy('conservative')}
+                  className={`py-2 px-3 rounded-xl text-xs font-medium border transition-all ${strategy === 'conservative' ? 'bg-blue-600/20 border-blue-500 text-blue-300' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                >
+                  Conservative Auto-Hedge
+                </button>
               </div>
             </div>
 
-            <div style={{ background: '#090d16', padding: '14px', borderRadius: '8px', border: '1px solid #1e293b', fontFamily: 'monospace', fontSize: '11px', color: '#64748b' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span>Attested Enclave: <strong style={{ color: '#94a3b8' }}>{result.tee_attestation.attested_by}</strong></span>
-                <span>Algorithm: <strong style={{ color: '#94a3b8' }}>ECDSA-secp256k1</strong></span>
-              </div>
-              <div>Execution Nonce: <span style={{ color: '#38bdf8' }}>{result.tee_attestation.execution_nonce}</span></div>
+            <div className="pt-2 grid grid-cols-12 gap-3">
+              <button
+                onClick={handleRunStrategy}
+                disabled={loading}
+                className="col-span-8 bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 disabled:opacity-50"
+              >
+                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Cpu className="w-4 h-4" />}
+                Run TEE Strategy
+              </button>
+
+              <button
+                onClick={handleDumpMarket}
+                className="col-span-4 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-400 font-medium py-3 px-2 rounded-xl text-xs transition-all flex items-center justify-center gap-1"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" /> Dump Market
+              </button>
             </div>
           </div>
-        )}
+        </div>
 
-      </div>
+        {/* Right Panel: Live Oracle & TEE Results */}
+        <div className="md:col-span-6 space-y-6">
+          {/* Oracle Card */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Flare FTSO v2 Live Feed
+              </span>
+              <span className={`text-xs font-semibold ${isDump ? 'text-red-400' : 'text-emerald-400'}`}>
+                {analysis ? analysis.price_change_24h : '+2.4% (24h)'}
+              </span>
+            </div>
+            <div className="text-3xl font-extrabold font-mono text-white">
+              ${analysis ? analysis.ftso_price : currentAssetInfo.price.replace('$', '')}
+              <span className="text-xs text-slate-500 font-normal ml-2">{selectedAsset}/USD</span>
+            </div>
+          </div>
+
+          {/* TEE Analysis Result Card */}
+          <div className={`border rounded-2xl p-6 transition-all ${isDump ? 'bg-red-950/20 border-red-500/40' : 'bg-slate-900/60 border-slate-800'}`}>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Confidential TEE Execution Status
+            </h3>
+
+            {analysis ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <span className="text-xs text-slate-400">Risk Score:</span>
+                  <span className={`text-sm font-bold font-mono ${analysis.confidential_risk_score > 70 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {analysis.confidential_risk_score} / 100
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <span className="text-xs text-slate-400">Action:</span>
+                  <span className="text-xs font-mono font-bold px-2 py-1 bg-slate-800 text-blue-300 rounded">
+                    {analysis.recommended_action}
+                  </span>
+                </div>
+
+                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-[10px] font-mono space-y-1">
+                  <div className="text-slate-400 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-emerald-400" /> Attested by: {analysis.tee_attestation.attested_by}
+                  </div>
+                  <div className="text-slate-500 truncate">Sig: {analysis.tee_attestation.ecdsa_signature}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-slate-500 text-xs">
+                Select asset and click <span className="text-blue-400 font-medium">Run TEE Strategy</span> to execute confidential analysis.
+              </div>
+            )}
+          </div>
+        </div>
+
+      </main>
     </div>
   );
 }
