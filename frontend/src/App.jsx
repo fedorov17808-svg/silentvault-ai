@@ -332,7 +332,6 @@ export default function App() {
           {/* HIGH-TECH ENCLAVE TERMINAL CARD */}
           <div style={{ background: isDump ? 'rgba(127,29,29,0.15)' : '#0b0f19', border: isDump ? '1px solid rgba(239,68,68,0.5)' : '1px solid #1f2937', borderRadius: '20px', padding: '24px', flexGrow: 1 }}>
             
-            {/* Title & Hardware Badges */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
                 🔐 CONFIDENTIAL TEE ATTESTATION & ON-CHAIN AUDIT
@@ -353,13 +352,12 @@ export default function App() {
                   ⚡ Executing Hardware Enclave Computation...
                 </div>
                 <div style={{ fontSize: '10px', color: '#6b7280', fontFamily: 'monospace' }}>
-                  decrypting_payload() -> validating_ftso_v2_oracle() -> signing_attestation()
+                  decrypting_payload() &#8594; validating_ftso_v2_oracle() &#8594; signing_attestation()
                 </div>
               </div>
             ) : analysis ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 
-                {/* Risk Score Gauge Bar */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
                     <span style={{ color: '#9ca3af', fontWeight: '500' }}>Confidential Risk Score:</span>
@@ -372,7 +370,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Status Badges */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ background: '#111827', padding: '10px 14px', borderRadius: '10px', border: '1px solid #1f2937' }}>
                     <div style={{ fontSize: '9px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Recommended Action</div>
@@ -389,7 +386,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Console Log + Copy Signature */}
                 <div style={{ background: '#030712', border: '1px solid #1f2937', borderRadius: '12px', padding: '12px', fontFamily: 'monospace', fontSize: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#34d399', fontWeight: '600', marginBottom: '6px' }}>
                     <span>✔ Attested by {analysis.signer}</span>
